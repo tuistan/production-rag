@@ -1,0 +1,26 @@
+# Embedding & Models
+sentence-transformers>=3.0,<4.0
+transformers>=4.40,<5.0
+
+# Vector Store
+chromadb>=0.5,<1.0
+
+# BM25
+rank-bm25>=0.2,<1.0
+
+# Text Processing
+beautifulsoup4>=4.12,<5.0
+requests>=2.31,<3.0
+
+# Evaluation
+rouge-score>=0.1,<1.0
+bert-score>=0.3,<1.0
+ragas>=0.1,<1.0  # Day 32 uncomment
+
+# API (Day 33)
+fastapi>=0.110,<1.0
+uvicorn>=0.29,<1.0
+
+# Utilities
+python-dotenv>=1.0,<2.0
+tqdm>=4.66,<5.0
