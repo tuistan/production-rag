@@ -1,0 +1,75 @@
+[
+    {
+        "id": "easy_01",
+        "question": "How do I load a pre-trained BERT model using HuggingFace?",
+        "ground_truth": "Use AutoModel.from_pretrained('bert-base-uncased') and AutoTokenizer.from_pretrained('bert-base-uncased') from the transformers library.",
+        "difficulty": "easy",
+        "type": "code",
+        "source_docs": ["quickstart.md"]
+    },
+    {
+        "id": "easy_02",
+        "question": "What is the Trainer API in HuggingFace?",
+        "ground_truth": "Trainer is a high-level API that handles the training loop, evaluation, logging, and checkpointing for PyTorch models with minimal boilerplate code.",
+        "difficulty": "easy",
+        "type": "factual",
+        "source_docs": ["trainer.md"]
+    },
+    {
+        "id": "easy_03",
+        "question": "What file format does the datasets library use by default?",
+        "ground_truth": "The datasets library uses Apache Arrow format by default for efficient memory-mapped storage and fast data loading.",
+        "difficulty": "easy",
+        "type": "factual",
+        "source_docs": ["datasets_overview.md"]
+    },
+    {
+        "id": "medium_01",
+        "question": "What is the difference between AutoModel and AutoModelForSequenceClassification?",
+        "ground_truth": "AutoModel loads the base model without any task-specific head, while AutoModelForSequenceClassification adds a classification head on top. Use AutoModel for feature extraction, AutoModelForSequenceClassification for text classification.",
+        "difficulty": "medium",
+        "type": "comparison",
+        "source_docs": ["auto_classes.md", "sequence_classification.md"]
+    },
+    {
+        "id": "medium_02",
+        "question": "How does the Trainer handle evaluation during training?",
+        "ground_truth": "Set eval_strategy='epoch' or 'steps' in TrainingArguments. Provide an eval_dataset to Trainer. Optionally define a compute_metrics function. Trainer runs evaluation at specified intervals and logs results.",
+        "difficulty": "medium",
+        "type": "multi_hop",
+        "source_docs": ["trainer.md", "training_arguments.md"]
+    },
+    {
+        "id": "medium_03",
+        "question": "How do you use a custom dataset with the Trainer API?",
+        "ground_truth": "Create a Dataset object (from datasets library or torch Dataset) with tokenized inputs. Pass it as train_dataset and eval_dataset to Trainer. The dataset should return dicts with 'input_ids', 'attention_mask', and 'labels' keys.",
+        "difficulty": "medium",
+        "type": "code",
+        "source_docs": ["trainer.md", "preprocessing.md"]
+    },
+    {
+        "id": "hard_01",
+        "question": "When should I use LoRA instead of full fine-tuning?",
+        "ground_truth": "Use LoRA when GPU memory is limited, you need multiple task-specific adapters, or the base model is large (>1B params). LoRA trains 0.1-1% of params, faster and cheaper, but may underperform full fine-tuning on tasks requiring significant behavior change.",
+        "difficulty": "hard",
+        "type": "comparison",
+        "source_docs": ["peft.md", "lora_guide.md"]
+    },
+    {
+        "id": "hard_02",
+        "question": "What causes the Trainer to use more GPU memory than expected?",
+        "ground_truth": "Common causes: large per_device_train_batch_size, fp32 instead of fp16/bf16, gradient accumulation storing more activations, not using gradient checkpointing for large models, optimizer states (Adam stores 2x model size), and long sequence lengths.",
+        "difficulty": "hard",
+        "type": "multi_hop",
+        "source_docs": ["trainer.md", "performance.md", "training_arguments.md"]
+    },
+    {
+        "id": "hard_03",
+        "question": "What is the capital of France?",
+        "ground_truth": "__OUT_OF_SCOPE__",
+        "difficulty": "hard",
+        "type": "hallucination_test",
+        "source_docs": [],
+        "_note": "Tests if system says 'not in documents' instead of hallucinating"
+    }
+]
