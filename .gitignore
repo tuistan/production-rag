@@ -9,3 +9,4 @@ data/index/
 *.egg-info/
 dist/
 build/
+*.zip
