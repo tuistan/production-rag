@@ -10,7 +10,7 @@ class Retriever:
         self.indexer = indexer
 
     def dense_search(self, query: str, top_k: int = 50) -> list[dict]:
-        """"Stage 1a: dense embedding similarity search"""
+        """Stage 1a: dense embedding similarity search"""
         pass
 
     def sparse_search(self, query: str, top_k: int = 50) -> list[dict]:

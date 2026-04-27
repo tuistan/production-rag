@@ -1,4 +1,4 @@
-"""End-to-end RAG Pipeline: teis all modules together."""
+"""End-to-end RAG Pipeline: ties all modules together."""
 from config import RAGConfig
 from src.data_pipeline import DataPipeline
 from src.indexer import Indexer
@@ -8,7 +8,7 @@ from src.generator import Generator
 
 class RAGPipeline:
     """Production RAG: retrieve -> generate -> return.
-    Orchestrates all modules. Each modul only know its own layer:
+    Orchestrates all modules. Each module only know its own layer:
     - DataPipeline: document -> chunks (does not know about indexer)
     - Indexer: chunks -> index (does not know where chunks came from)
     - Retriever: query -> relevant chunks
@@ -48,7 +48,7 @@ class RAGPipeline:
         contexts = self.retriever.retrieve(question)
 
         # Step 2: Generate answer from contexts
-        result = self.generate.answer(question, contexts)
+        result = self.generator.answer(question, contexts)
 
         return {
             "answer": result.get("answer", ""),
