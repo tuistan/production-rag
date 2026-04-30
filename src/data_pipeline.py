@@ -2,25 +2,33 @@
 Data Pipeline: ingestion, cleaning, chunking.
 """
 
-import re, time, json, logging, requests
+import re
+import time
+import json
+import logging
+import requests
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class Document:
     """A single document with metadata."""
+
     content: str
     source: str
     title: str = ""
     doc_type: str = ""  # "tutorial" | "api_reference" | "guide"
     url: str = ""
 
+
 @dataclass
 class Chunk:
     """A single chunk with metadata for retrieval."""
+
     text: str
     source: str
     title: str = ""
@@ -28,29 +36,52 @@ class Chunk:
     heading_path: str = ""
     chunk_index: int = 0
 
+
 class DataPipeline:
     """Handles document ingestion, cleaning, and chunking."""
+
     PRIORITY_DOCS = [
-        "quicktour.md", "training.md", "trainer.md",
-        "tasks/image_classification.md", "tokenizer_summary.md",
-        "peft.md", "model_sharing.md",
-        "installation.md", "tasks/sequence_classification.md",
+        "quicktour.md",
+        "training.md",
+        "trainer.md",
+        "tasks/image_classification.md",
+        "tokenizer_summary.md",
+        "peft.md",
+        "model_sharing.md",
+        "installation.md",
+        "tasks/sequence_classification.md",
         "tasks/token_classification.md",
         "tasks/question_answering.md",
-        "tasks/summarization.md", "tasks/language_modeling.md",
-        "generation_strategies.md", "llm_tutorial.md",
-        "pipeline_tutorial.md", "create_a_model.md",
+        "tasks/summarization.md",
+        "tasks/language_modeling.md",
+        "generation_strategies.md",
+        "llm_tutorial.md",
+        "pipeline_tutorial.md",
+        "create_a_model.md",
         "run_scripts.md",
     ]
 
     GITHUB_RAW = (
-        "https://raw.githubusercontent.com/"
-        "huggingface/transformers/main/docs/source/en"
+        "https://raw.githubusercontent.com/huggingface/transformers/main/docs/source/en"
     )
+
     def __init__(self, config):
         self.config = config
         self.raw_dir = Path(config.raw_data_dir)
         self.raw_dir.mkdir(parents=True, exist_ok=True)
+
+    # ----- public API（按 pipeline 顺序）-----
+    def run(self, source_urls: list[str] = None) -> list[Chunk]:
+        """End to end: ingest -> clean-> chunk all documents."""
+        docs = self.ingest(source_urls)
+        all_chunks = []
+        for doc in docs:
+            cleaned = self.clean(doc)
+            chunks = self.chunk(cleaned)
+            all_chunks.extend(chunks)
+        logger.info(f"Pipeline: {len(docs)} docs -> {len(all_chunks)}")
+        self._save_chunks(all_chunks)
+        return all_chunks
 
     def ingest(self, source_urls=None) -> list[Document]:
         """Fetch documents from URLs or local files."""
@@ -77,27 +108,21 @@ class DataPipeline:
 
             doc_type = self._classify_doc(filename, content)
             title = self._extract_title(content) or filename
-            docs.append(Document(
-                content=content, source=filename,
-                title=title, doc_type=doc_type,
-                url=f"{self.GITHUB_RAW}/{filename}",
-            ))
+            docs.append(
+                Document(
+                    content=content,
+                    source=filename,
+                    title=title,
+                    doc_type=doc_type,
+                    url=f"{self.GITHUB_RAW}/{filename}",
+                )
+            )
 
         logger.info(f"Ingested {len(docs)} documents")
         return docs
 
-    def _classify_doc(self, filename, content):
-        if "tasks/" in filename: return "tutorial"
-        if "tutorial" in filename: return "tutorial"
-        if "[[autodoc]]" in content: return "api_reference"
-        return "guide"
-
-    def _extract_title(self, content):
-        match = re.search(r"^#\s+(.+)$", content, re.MULTILINE)
-        return match.group(1).strip() if match else ""
-
     def clean(self, doc):
-        """Remove noise from markdown document."""
+        """Remove noise from Markdown document."""
         text = doc.content
 
         # 1. YAML front matter
@@ -116,7 +141,8 @@ class DataPipeline:
         text = re.sub(
             r"</?(?:Tip|frameworkcontent|jax|tf|pt|Deprecated"
             r"|hfoptions|hfoption|Youtube)(?:\s[^>]*)?>",
-            "", text
+            "",
+            text,
         )
 
         # 6. iframe blocks (dataset previews)
@@ -125,7 +151,7 @@ class DataPipeline:
         # 7. div+img blocks (images useless for RAG)
         text = re.sub(r"<div[^>]*>.*?</div>", "", text, flags=re.DOTALL)
 
-        # 8. Simplify markdown links: [text](url) -> text
+        # 8. Simplify Markdown links: [text](url) -> text
         text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
 
         # 9. Collapse 3+ blank lines into 2
@@ -133,43 +159,12 @@ class DataPipeline:
 
         text = text.strip()
         return Document(
-            content=text, source=doc.source,
-            title=doc.title, doc_type=doc.doc_type, url=doc.url,
+            content=text,
+            source=doc.source,
+            title=doc.title,
+            doc_type=doc.doc_type,
+            url=doc.url,
         )
-
-    def run(self, source_urls: list[str] = None) -> list[Chunk]:
-        """End to end: ingest -> clean-> chunk all documents.
-        """
-        docs = self.ingest(source_urls)
-        all_chunks = []
-        for doc in docs:
-            cleaned = self.clean(doc)
-            chunks = self.chunk(cleaned)
-            all_chunks.extend(chunks)
-        logger.info(f"Pipeline: {len(docs)} docs -> {len(all_chunks)}")
-        self._save_chunks(all_chunks)
-        return all_chunks
-
-    def _save_chunks(self, chunks):
-        """Save chunks to JSON for Day 31 Indexer"""
-        output_dir = Path(self.config.processed_data_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / "chunks.json"
-        data = [{"text": chunk.text, "source": chunk.source,
-                 "title": chunk.title, "doc_type": chunk.doc_type,
-                 "chunk_index": chunk.chunk_index,
-                 "heading_path": chunk.heading_path}
-                for chunk in chunks]
-
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        logger.info(f"Saved {len(chunks)} chunks to {output_path}")
-
-    @staticmethod
-    def load_chunks(path):
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-        return [Chunk(**item) for item in data]
 
     def chunk(self, doc: Document) -> list[Chunk]:
         """Heading-aware chunking for Markdown documents."""
@@ -186,29 +181,55 @@ class DataPipeline:
             if len(prefix + section_text) <= self.config.chunk_size:
                 chunk_text = prefix + section_text
                 if len(chunk_text.strip()) >= self.config.min_chunk_size:
-                    chunks.append(Chunk(
-                        text=chunk_text, source=doc.source,
-                        title=doc.title, doc_type=doc.doc_type,
-                        chunk_index=chunk_idx, heading_path=heading_path,
-                    ))
+                    chunks.append(
+                        Chunk(
+                            text=chunk_text,
+                            source=doc.source,
+                            title=doc.title,
+                            doc_type=doc.doc_type,
+                            chunk_index=chunk_idx,
+                            heading_path=heading_path,
+                        )
+                    )
                     chunk_idx += 1
             else:
                 max_body = self.config.chunk_size - len(prefix)
                 sub_chunks = self._recursive_split(
-                    section_text, max_body, self.config.chunk_overlap)
+                    section_text, max_body, self.config.chunk_overlap
+                )
                 for sub_text in sub_chunks:
                     chunk_text = prefix + sub_text
                     if len(chunk_text.strip()) >= self.config.min_chunk_size:
-                        chunks.append(Chunk(
-                            text=chunk_text, source=doc.source,
-                            title=doc.title, doc_type=doc.doc_type,
-                            chunk_index=chunk_idx, heading_path=heading_path,
-                        ))
+                        chunks.append(
+                            Chunk(
+                                text=chunk_text,
+                                source=doc.source,
+                                title=doc.title,
+                                doc_type=doc.doc_type,
+                                chunk_index=chunk_idx,
+                                heading_path=heading_path,
+                            )
+                        )
                         chunk_idx += 1
 
         logger.info(f"Chunked {doc.source}: {len(chunks)} chunks")
         return chunks
 
+    # ----- ingest helpers -----
+    def _classify_doc(self, filename, content):
+        if "tasks/" in filename:
+            return "tutorial"
+        if "tutorial" in filename:
+            return "tutorial"
+        if "[[autodoc]]" in content:
+            return "api_reference"
+        return "guide"
+
+    def _extract_title(self, content):
+        match = re.search(r"^#\s+(.+)$", content, re.MULTILINE)
+        return match.group(1).strip() if match else ""
+
+    # ----- chunk helpers -----
     def _split_by_headings(self, text):
         """Split markdown by headings -> (heading_path, content) pairs."""
         heading_re = re.compile(r"^(#{1,3})\s+(.+)$", re.MULTILINE)
@@ -218,7 +239,7 @@ class DataPipeline:
 
         for match in heading_re.finditer(text):
             if last_end > 0 or match.start() > 0:
-                content = text[last_end:match.start()].strip()
+                content = text[last_end : match.start()].strip()
                 if content:
                     path = " > ".join(h[1] for h in heading_stack)
                     sections.append((path, content))
@@ -234,6 +255,25 @@ class DataPipeline:
             path = " > ".join(h[1] for h in heading_stack)
             sections.append((path, remaining))
         return sections
+
+    def _merge_short_sections(self, sections, min_size=200):
+        if not sections:
+            return sections
+        merged = [sections[0]]
+        for path, content in sections[1:]:
+            prev_path, prev_content = merged[-1]
+            if (
+                len(prev_content) < min_size
+                and len(content) < min_size
+                and self._share_parent(prev_path, path)
+            ):
+                merged[-1] = (path, prev_content + "\n\n" + content)
+            else:
+                merged.append((path, content))
+        return merged
+
+    def _share_parent(self, path1, path2):
+        return path1.split(" > ")[:-1] == path2.split(" > ")[:-1]
 
     def _recursive_split(self, text, max_size, overlap):
         """Split: paragraphs first, then sentences."""
@@ -269,7 +309,8 @@ class DataPipeline:
             for i in range(1, len(chunks)):
                 tail = chunks[i - 1][-overlap:]
                 sp = tail.find(" ")
-                if sp != -1: tail = tail[sp + 1:]
+                if sp != -1:
+                    tail = tail[sp + 1 :]
                 overlapped.append(tail + " " + chunks[i])
             chunks = overlapped
 
@@ -277,13 +318,14 @@ class DataPipeline:
         for c in chunks:
             if len(c) > max_size:
                 for i in range(0, len(c), max_size):
-                    final.append(c[i:i + max_size])
+                    final.append(c[i : i + max_size])
             else:
                 final.append(c)
         chunks = final
 
         return chunks
 
+    # ----- Dead code -----
     def _protect_code_blocks(self, text):
         """Replace fenced code blocks with placeholders."""
         code_blocks = {}
@@ -304,17 +346,31 @@ class DataPipeline:
             text = text.replace(key, block)
         return text
 
-    def _merge_short_sections(self, sections, min_size=200):
-        if not sections: return sections
-        merged = [sections[0]]
-        for path, content in sections[1:]:
-            prev_path, prev_content = merged[-1]
-            if (len(prev_content) < min_size and len(content) < min_size
-                    and self._share_parent(prev_path, path)):
-                merged[-1] = (path, prev_content + "\n\n" + content)
-            else:
-                merged.append((path, content))
-        return merged
+    # ----- persistence -----
+    def _save_chunks(self, chunks):
+        """Save chunks to JSON for Day 31 Indexer"""
+        output_dir = Path(self.config.processed_data_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "chunks.json"
+        data = [
+            {
+                "text": chunk.text,
+                "source": chunk.source,
+                "title": chunk.title,
+                "doc_type": chunk.doc_type,
+                "chunk_index": chunk.chunk_index,
+                "heading_path": chunk.heading_path,
+            }
+            for chunk in chunks
+        ]
 
-    def _share_parent(self, path1, path2):
-        return path1.split(" > ")[:-1] == path2.split(" > ")[:-1]
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        logger.info(f"Saved {len(chunks)} chunks to {output_path}")
+
+    # ----- Static method -----
+    @staticmethod
+    def load_chunks(path):
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return [Chunk(**item) for item in data]

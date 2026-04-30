@@ -22,10 +22,12 @@ class RAGConfig:
     embedding_dim: int = 768
 
     # --- Retrieval ---
-    top_k_recall: int = 50  # Stage 1: candidates before reranking
-    top_k_rerank: int = 5  # Stage 2: final results after re-ranking
-    bm25_weight: float = 0.3  # BM25 weight in RRF fusion
-    dense_weight: float = 0.7  # Dense embedding weight in RRF fusion
+    top_k_recall: int = 50      # Stage 1: candidates before reranking
+    top_k_fusion: int = 20      # Stage 1.5: RRF 融合后送给 cross-encoder 的数
+    top_k_rerank: int = 5       # Stage 2: cross-encoder 精排后最终返回数
+    rrf_k: int = 60             # RRF smooth factor（经验值，避免 top-1 dominate）
+    bm25_weight: float = 0.3    # BM25 weight in RRF fusion
+    dense_weight: float = 0.7   # Dense embedding weight in RRF fusion
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
     # --- Generation ---
